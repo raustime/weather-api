@@ -60,6 +60,7 @@ func NewDB() *bun.DB {
 		if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to connect to database: %v",  err)
 		}
-
+		
+		log.Println("✅ Connected to database successfully.")
 	return db
 }
