@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"weatherapi/internal/db/models"
@@ -9,7 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
+
+	"weatherapi/internal/mailer"
 )
+
+var ErrAlreadySubscribed = errors.New("email already subscribed")
 
 func SubscribeHandler(db bun.IDB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -19,7 +26,7 @@ func SubscribeHandler(db bun.IDB) gin.HandlerFunc {
 			Frequency string `form:"frequency" binding:"required,oneof=hourly daily"`
 		}
 		if err := c.ShouldBind(&form); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
 
@@ -27,7 +34,7 @@ func SubscribeHandler(db bun.IDB) gin.HandlerFunc {
 		var existing models.Subscription
 		err := db.NewSelect().Model(&existing).Where("email = ?", form.Email).Scan(c)
 		if err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "email already subscribed"})
+			c.AbortWithStatus(http.StatusConflict)
 			return
 		}
 
@@ -41,42 +48,89 @@ func SubscribeHandler(db bun.IDB) gin.HandlerFunc {
 		}
 
 		if _, err := db.NewInsert().Model(sub).Exec(c); err != nil {
+			log.Printf("DB insert error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not subscribe"})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "Subscription successful. Confirmation email sent."})
+		// Send confirmation email
+		if err := mailer.SendConfirmationEmail(form.Email, token); err != nil {
+			// Підписку вже створено, але повідомляємо про помилку з email
+			log.Printf("Failed to send confirmation email to %s: %v", form.Email, err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		c.Status(http.StatusOK)
+	}
+}
+
+func InvalidConfirmHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.AbortWithStatus(http.StatusBadRequest)
 	}
 }
 
 func ConfirmHandler(db bun.IDB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token := c.Param("token")
+		tokenWithSlash := c.Param("tokenPath")
+		token := strings.TrimPrefix(tokenWithSlash, "/")
+
+		if _, err := uuid.Parse(token); err != nil {
+			c.AbortWithStatus(http.StatusBadRequest) // 400: Invalid token format
+			return
+		}
+
 		var sub models.Subscription
 		err := db.NewSelect().Model(&sub).Where("token = ?", token).Scan(c)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
+			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
 		sub.Confirmed = true
 		sub.ConfirmedAt = time.Now()
 		_, err = db.NewUpdate().Model(&sub).WherePK().Exec(c)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to confirm"})
+			log.Printf("Failed to confirm token %s: %v", token, err)
+			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Subscription confirmed successfully"})
+		c.Status(http.StatusOK)
+	}
+}
+
+func InvalidUnsubscribeHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.AbortWithStatus(http.StatusBadRequest)
 	}
 }
 
 func UnsubscribeHandler(db bun.IDB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token := c.Param("token")
-		_, err := db.NewDelete().Model((*models.Subscription)(nil)).Where("token = ?", token).Exec(c)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
+		//token := c.Param("token")
+		tokenWithSlash := c.Param("tokenPath")
+		token := strings.TrimPrefix(tokenWithSlash, "/")
+
+		if _, err := uuid.Parse(token); err != nil {
+			c.AbortWithStatus(http.StatusBadRequest) // 400: Invalid token format
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Unsubscribed successfully"})
+
+		res, err := db.NewDelete().Model((*models.Subscription)(nil)).Where("token = ?", token).Exec(c)
+		if err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		count, err := res.RowsAffected()
+		if err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		if count == 0 {
+			c.AbortWithStatus(http.StatusNotFound) // 404 Token not found
+			return
+		}
+
+		c.Status(http.StatusOK)
 	}
 }

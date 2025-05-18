@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
+
+	"weatherapi/internal/openweatherapi"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,14 +19,24 @@ func GetWeatherHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		city := c.Query("city")
 		if city == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "city is required"})
+			c.Status(http.StatusBadRequest) // 400 без тіла
 			return
 		}
-		// Dummy data for now
+
+		weather, err := openweatherapi.FetchWeather(city)
+		if err != nil {
+			if errors.Is(err, openweatherapi.ErrCityNotFound) {
+				c.Status(404)
+				return
+			}
+			c.Status(400)
+			return
+		}
+
 		c.JSON(http.StatusOK, WeatherResponse{
-			Temperature: 20.5,
-			Humidity:    60,
-			Description: "Sunny",
+			Temperature: weather.Temperature,
+			Humidity:    weather.Humidity,
+			Description: weather.Description,
 		})
 	}
 }

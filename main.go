@@ -7,6 +7,7 @@ import (
 
 	"weatherapi/internal/api"
 	"weatherapi/internal/db"
+	"weatherapi/internal/jobs"
 
 	"database/sql"
 
@@ -38,6 +39,8 @@ func main() {
 	if err := db.RunMigrations(context.Background(), dbconn); err != nil {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
+
+	jobs.StartWeatherNotificationLoop(dbconn)
 
 	r := api.SetupRouter(dbconn)
 

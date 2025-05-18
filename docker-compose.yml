@@ -20,10 +20,7 @@ services:
       - '8080:8080'
     environment:
       - DB_URL=postgres://postgres:postgres@db:5432/weatherdb?sslmode=disable
-    volumes:
-      - .:/app
-    command: ["go", "run", "main.go"]
-    #command: ['./app']
+    command: ['./app']
 
 volumes:
   pgdata:
