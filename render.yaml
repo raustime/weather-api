@@ -9,6 +9,4 @@ services:
     buildCommand: ""   # Не потрібно — Render сам виконує docker build
     startCommand: ""   # Не потрібно — CMD у Dockerfile вже є
     autoDeploy: true
-    envVars:
-      - key: DB_URL
-        value: ppostgresql://user1:p9zQbtQCqcCcoBvwxhjjybBa9CaRXkxI@dpg-d0ieqrmmcj7s73djei1g-a/weatherdb_1b9e
+    

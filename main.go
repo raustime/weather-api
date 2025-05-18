@@ -11,6 +11,7 @@ import (
 
 	"database/sql"
 
+	"github.com/gin-contrib/cors"
 	"github.com/joho/godotenv"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -43,6 +44,14 @@ func main() {
 	jobs.StartWeatherNotificationLoop(dbconn)
 
 	r := api.SetupRouter(dbconn)
+	// Додаємо CORS middleware
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"}, // або вкажи конкретний origin
+		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 
 	log.Printf("Starting server on :8080")
 	err = r.Run("0.0.0.0:8080")
