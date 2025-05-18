@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"weatherapi/internal/api"
 	"weatherapi/internal/db"
@@ -46,11 +47,12 @@ func main() {
 	r := api.SetupRouter(dbconn)
 	// Додаємо CORS middleware
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"}, // або вкажи конкретний origin
+		AllowOrigins:     []string{"https://weather-sub-production.up.railway.app"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
 	}))
 
 	log.Printf("Starting server on :8080")
