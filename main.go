@@ -47,10 +47,10 @@ func main() {
 	r := api.SetupRouter(dbconn)
 	// Додаємо CORS middleware
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://weather-sub-production.up.railway.app"},
-		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type", "Accept-Encoding"},
-		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials", "Access-Control-Allow-Headers", "Access-Control-Allow-Methods"},
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
