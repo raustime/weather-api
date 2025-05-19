@@ -20,5 +20,8 @@ RUN go build -o app main.go
 # Переконуємося, що app має права на виконання
 RUN chmod +x ./app
 
+COPY wait-for-postgres.sh /wait-for-postgres.sh
+RUN chmod +x /wait-for-postgres.sh
+
 # Запускаємо бінарник
 CMD ["./app"]
