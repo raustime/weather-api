@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM golang:1.21
 
+# Встановлюємо bash та netcat
+RUN apt-get update && apt-get install -y bash netcat-openbsd && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Копіюємо go.mod та go.sum і завантажуємо залежності

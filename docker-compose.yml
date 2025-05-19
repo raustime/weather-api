@@ -21,6 +21,16 @@ services:
     environment:
       - DB_URL=postgres://postgres:postgres@db:5432/weatherdb?sslmode=disable
     command: ['./app']
+  test-runner:
+    build: .
+    container_name: weather_api_tests
+    depends_on:
+      - db
+    environment:
+      - TEST_DB_URL=postgres://postgres:postgres@db:5432/weatherdb_test?sslmode=disable
+    entrypoint: ["/wait-for-postgres.sh"]
+    command: ["go", "test", "-v", "./..."]
+
 
 volumes:
   pgdata:
