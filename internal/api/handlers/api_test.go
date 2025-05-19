@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"weatherapi/internal/api/handlers"
+	dbpkg "weatherapi/internal/db"
 	"weatherapi/internal/db/models"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 func setupRouter(db bun.IDB) *gin.Engine {
@@ -153,17 +155,17 @@ func setupTestDB(t *testing.T) *bun.DB {
 		t.Fatal("TEST_DB_URL not set")
 	}
 
-	sqldb, err := sql.Open("pg", dsn)
-	if err != nil {
-		t.Fatalf("failed to open DB: %v", err)
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+	db := bun.NewDB(sqldb, pgdialect.New())
+	ctx := context.Background()
+
+	// Запускаємо міграції (в твоєму пакеті dbpkg)
+	if err := dbpkg.RunMigrations(ctx, db); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
 	}
 
-	db := bun.NewDB(sqldb, pgdialect.New())
-
 	// Очистка таблиці subscriptions
-
-	// Очистка таблиці через raw SQL з RESTART IDENTITY і CASCADE
-	_, err = db.ExecContext(context.Background(), `TRUNCATE TABLE subscriptions RESTART IDENTITY CASCADE;`)
+	_, err := db.ExecContext(ctx, `TRUNCATE TABLE subscriptions RESTART IDENTITY CASCADE;`)
 	if err != nil {
 		t.Fatalf("failed to truncate subscriptions table: %v", err)
 	}

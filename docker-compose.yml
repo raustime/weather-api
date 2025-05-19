@@ -1,36 +1,38 @@
 services:
   db:
     image: postgres:15
-    container_name: weather_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: weatherdb
     volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - pgdata:/var/lib/postgresql/data
     ports:
       - '5432:5432'
 
   api:
     build: .
-    container_name: weather_api
+    working_dir: /app
     depends_on:
       - db
-    ports:
-      - '8080:8080'
     environment:
       - DB_URL=postgres://postgres:postgres@db:5432/weatherdb?sslmode=disable
-    command: ['./app']
+    entrypoint: ["/wait-for-postgres.sh"]
+    command: ["./app"]
+    ports:
+      - "8080:8080"
+
   test-runner:
     build: .
-    container_name: weather_api_tests
     depends_on:
       - db
     environment:
       - TEST_DB_URL=postgres://postgres:postgres@db:5432/weatherdb_test?sslmode=disable
+    working_dir: /app
     entrypoint: ["/wait-for-postgres.sh"]
     command: ["go", "test", "-v", "./..."]
 
-
 volumes:
   pgdata:
+  
