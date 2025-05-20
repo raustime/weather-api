@@ -10,6 +10,7 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       - '5432:5432'
+    restart: unless-stopped
 
   api:
     build: .
@@ -18,10 +19,14 @@ services:
       - db
     environment:
       - DB_URL=postgres://postgres:postgres@db:5432/weatherdb?sslmode=disable
-    entrypoint: ["/wait-for-postgres.sh"]
+      - PGHOST=db
+      - PGPORT=5432
+      - PGUSER=postgres
+    entrypoint: ["/app/wait-for-postgres.sh"]
     command: ["./app"]
     ports:
       - "8080:8080"
+    restart: unless-stopped
 
   test-runner:
     build: .
@@ -29,6 +34,9 @@ services:
       - db
     environment:
       - TEST_DB_URL=postgres://postgres:postgres@db:5432/weatherdb_test?sslmode=disable
+      - PGHOST=db
+      - PGPORT=5432
+      - PGUSER=postgres
     working_dir: /app
     entrypoint: ["/wait-for-postgres.sh"]
     command: ["go", "test", "-v", "./..."]

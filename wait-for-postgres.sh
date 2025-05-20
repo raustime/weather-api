@@ -1,8 +1,12 @@
 #!/bin/sh
 
-echo "Waiting for postgres..."
+: "${PGHOST:=db}"
+: "${PGPORT:=5432}"
+: "${PGUSER:=postgres}"
 
-until pg_isready -h db -p 5432 -U postgres > /dev/null 2>&1; do
+echo "Waiting for postgres at $PGHOST:$PGPORT as user $PGUSER..."
+
+until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" > /dev/null 2>&1; do
   echo "Waiting for postgres..."
   sleep 2
 done

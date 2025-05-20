@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,24 +32,6 @@ func setupRouter(db bun.IDB) *gin.Engine {
 	r.GET("/api/unsubscribe/:token", handlers.UnsubscribeHandler(db))
 
 	return r
-}
-
-func initialTestDB(t *testing.T) *bun.DB {
-
-	db := setupTestDB(t)
-	ctx := context.Background()
-	// 5. Міграції або створення таблиць
-	if err := db.ResetModel(ctx, (*models.Subscription)(nil)); err != nil {
-		log.Fatalf("failed to reset model: %v", err)
-	}
-
-	return db
-}
-
-func isDatabaseExistsError(err error) bool {
-	return err != nil && ( // PostgreSQL код "42P04": duplicate_database
-	err.Error() == `pq: database "weatherdb_test" already exists` ||
-		err.Error() == `ERROR: database "weatherdb_test" already exists (SQLSTATE 42P04)`)
 }
 
 func TestSubscribe_Success(t *testing.T) {
