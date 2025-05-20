@@ -9,6 +9,7 @@ import (
 	"weatherapi/internal/api"
 	"weatherapi/internal/db"
 	"weatherapi/internal/jobs"
+	"weatherapi/internal/mailer"
 
 	"database/sql"
 
@@ -42,9 +43,12 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	jobs.StartWeatherNotificationLoop(dbconn)
+	mailerSender := &mailer.SMTPSender{}
 
-	r := api.SetupRouter(dbconn)
+	jobs.StartWeatherNotificationLoop(dbconn, mailerSender)
+
+	r := api.SetupRouter(dbconn, mailerSender)
+	r.SetTrustedProxies([]string{})
 	// Додаємо CORS middleware
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},

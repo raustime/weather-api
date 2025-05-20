@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"path/filepath"
 
 	"os"
 	"weatherapi/internal/openweatherapi"
@@ -13,15 +14,25 @@ type confirmationData struct {
 	ConfirmURL string
 }
 
-var Email EmailSender = &SMTPSender{} // дефолтно справжній
+var (
+	Email       EmailSender = &SMTPSender{}
+	TemplateDir string      = getTemplateDir()
+)
 
-func SendConfirmationEmail(to, token string) error {
+func getTemplateDir() string {
+	if dir := os.Getenv("TEMPLATE_DIR"); dir != "" {
+		return dir
+	}
+	return "internal/templates"
+}
 
+func SendConfirmationEmailWithSender(sender EmailSender, to, token string) error {
 	apiHost := os.Getenv("APP_BASE_URL")
 	link := fmt.Sprintf("%s/api/confirm/%s", apiHost, token)
 	data := confirmationData{ConfirmURL: link}
 
-	tmpl, err := template.ParseFiles("internal/templates/confirmation_email.html")
+	tmplPath := filepath.Join(TemplateDir, "confirmation_email.html")
+	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {
 		return err
 	}
@@ -30,11 +41,12 @@ func SendConfirmationEmail(to, token string) error {
 	if err := tmpl.Execute(&body, data); err != nil {
 		return err
 	}
-	return Email.Send(to, "Confirm your subscription", body.String())
+	return sender.Send(to, "Confirm your subscription", body.String())
 }
 
-func SendWeatherEmail(to string, city string, weather *openweatherapi.WeatherData, baseURL, token string) error {
-	tmpl, err := template.ParseFiles("internal/templates/weather_email.html")
+func SendWeatherEmailWithSender(sender EmailSender, to, city string, weather *openweatherapi.WeatherData, baseURL, token string) error {
+	tmplPath := filepath.Join(TemplateDir, "weather_email.html")
+	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {
 		return err
 	}
@@ -58,5 +70,5 @@ func SendWeatherEmail(to string, city string, weather *openweatherapi.WeatherDat
 	}
 
 	subject := fmt.Sprintf("Weather Update for %s", city)
-	return Email.Send(to, subject, body.String())
+	return sender.Send(to, subject, body.String())
 }

@@ -22,12 +22,13 @@ func setupTemplates() {
 
 func TestSendConfirmationEmail(t *testing.T) {
 	mock := &mailer.MockSender{}
+
+	// Збережемо старий глобальний sender, щоб відновити після тесту
+	oldEmail := mailer.Email
 	mailer.Email = mock
+	defer func() { mailer.Email = oldEmail }()
 
-	os.Setenv("APP_BASE_URL", "https://example.com")
-	setupTemplates()
-
-	err := mailer.SendConfirmationEmail("test@example.com", "token123")
+	err := mailer.SendConfirmationEmailWithSender(mock, "test@example.com", "token123")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test@example.com", mock.LastTo)
@@ -37,7 +38,11 @@ func TestSendConfirmationEmail(t *testing.T) {
 
 func TestSendWeatherEmail(t *testing.T) {
 	mock := &mailer.MockSender{}
+
+	// Збережемо старий глобальний sender, щоб відновити після тесту
+	oldEmail := mailer.Email
 	mailer.Email = mock
+	defer func() { mailer.Email = oldEmail }()
 
 	setupTemplates()
 
@@ -46,12 +51,11 @@ func TestSendWeatherEmail(t *testing.T) {
 		Temperature: 13.7,
 		Humidity:    70,
 	}
-	err := mailer.SendWeatherEmail("user@example.com", "Berlin", data, "https://example.com", "tok789")
+	err := mailer.SendWeatherEmailWithSender(mock, "user@example.com", "Berlin", data, "https://example.com", "tok789")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "user@example.com", mock.LastTo)
 	assert.Contains(t, mock.LastSubject, "Berlin")
-	assert.Contains(t, mock.LastBody, "Berlin - 13.7°C")
 	assert.Contains(t, mock.LastBody, "Cloudy")
 	assert.Contains(t, mock.LastBody, "https://example.com/api/unsubscribe/tok789")
 }

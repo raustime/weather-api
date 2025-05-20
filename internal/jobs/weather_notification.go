@@ -13,18 +13,18 @@ import (
 	"github.com/uptrace/bun"
 )
 
-func StartWeatherNotificationLoop(db *bun.DB) {
+func StartWeatherNotificationLoop(db *bun.DB, sender mailer.EmailSender) {
 	go func() {
 		for {
 			now := time.Now()
 
 			// Надсилати щогодини (00 хвилин)
 			if now.Minute() == 0 {
-				sendUpdates(db, "hourly")
+				sendUpdates(db, "hourly", sender)
 
 				// О 8:00 — щоденні
 				if now.Hour() == 8 {
-					sendUpdates(db, "daily")
+					sendUpdates(db, "daily", sender)
 				}
 			}
 
@@ -32,17 +32,21 @@ func StartWeatherNotificationLoop(db *bun.DB) {
 		}
 	}()
 }
-func sendUpdates(db *bun.DB, frequency string) {
+func sendUpdates(db *bun.DB, frequency string, sender mailer.EmailSender) {
 
 	baseURL := os.Getenv("APP_BASE_URL")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	var subs []models.Subscription
 	err := db.NewSelect().
 		Model(&subs).
 		Where("confirmed = TRUE").
 		Where("frequency = ?", frequency).
-		Scan(context.Background())
+		Scan(ctx)
 	if err != nil {
-		log.Printf("Failed to fetch subscriptions: %v", err)
+		log.Printf("Failed to fetch %s subscriptions: %v", frequency, err)
 		return
 	}
 
@@ -53,9 +57,11 @@ func sendUpdates(db *bun.DB, frequency string) {
 			continue
 		}
 
-		err = mailer.SendWeatherEmail(sub.Email, sub.City, weather, baseURL, sub.Token)
+		err = mailer.SendWeatherEmailWithSender(sender, sub.Email, sub.City, weather, baseURL, sub.Token)
 		if err != nil {
 			log.Printf("Failed to send weather email to %s: %v", sub.Email, err)
+		} else {
+			log.Printf("Sent %s weather email to %s (%s)", frequency, sub.Email, sub.City)
 		}
 	}
 }

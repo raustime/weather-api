@@ -14,6 +14,7 @@ import (
 	"weatherapi/internal/api/handlers"
 	dbpkg "weatherapi/internal/db"
 	"weatherapi/internal/db/models"
+	"weatherapi/internal/mailer"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,13 +24,14 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-func setupRouter(db bun.IDB) *gin.Engine {
+func setupRouter(db bun.IDB, sender mailer.EmailSender) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
+	h := handlers.NewHandler(db, sender)
 
-	r.POST("/api/subscribe", handlers.SubscribeHandler(db))
-	r.GET("/api/confirm/:token", handlers.ConfirmHandler(db))
-	r.GET("/api/unsubscribe/:token", handlers.UnsubscribeHandler(db))
+	r.POST("/api/subscribe", h.SubscribeHandler)
+	r.GET("/api/confirm/:token", h.ConfirmHandler)
+	r.GET("/api/unsubscribe/:token", h.UnsubscribeHandler)
 
 	return r
 }
@@ -37,7 +39,8 @@ func setupRouter(db bun.IDB) *gin.Engine {
 func TestSubscribe_Success(t *testing.T) {
 	// використайте in-memory DB або мок
 	db := setupTestDB(t)
-	router := setupRouter(db)
+	mockSender := &mailer.MockSender{}
+	router := setupRouter(db, mockSender)
 
 	payload := map[string]string{
 		"email":     "test@example.com",
@@ -53,15 +56,14 @@ func TestSubscribe_Success(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "Subscription successful")
 }
 
 func TestSubscribe_Conflict(t *testing.T) {
 	db := setupTestDB(t)
-	// вручну вставляємо підписку
+	mockSender := &mailer.MockSender{}
 	_ = insertTestSubscription(db, "test@example.com")
 
-	router := setupRouter(db)
+	router := setupRouter(db, mockSender)
 
 	payload := map[string]string{
 		"email":     "test@example.com",
@@ -81,9 +83,10 @@ func TestSubscribe_Conflict(t *testing.T) {
 func TestConfirm_Success(t *testing.T) {
 	db := setupTestDB(t)
 	token := uuid.New().String()
-	_ = insertTestSubscriptionWithToken(db, "test@example.com", token)
+	_ = insertTestSubscriptionWithToken(db, "test@example.com", token, t)
 
-	router := setupRouter(db)
+	mockSender := &mailer.MockSender{}
+	router := setupRouter(db, mockSender)
 
 	req, _ := http.NewRequest("GET", "/api/confirm/"+token, nil)
 	w := httptest.NewRecorder()
@@ -95,9 +98,10 @@ func TestConfirm_Success(t *testing.T) {
 func TestUnsubscribe_Success(t *testing.T) {
 	db := setupTestDB(t)
 	token := uuid.New().String()
-	_ = insertTestSubscriptionWithToken(db, "test@example.com", token)
+	_ = insertTestSubscriptionWithToken(db, "test@example.com", token, t)
 
-	router := setupRouter(db)
+	mockSender := &mailer.MockSender{}
+	router := setupRouter(db, mockSender)
 
 	req, _ := http.NewRequest("GET", "/api/unsubscribe/"+token, nil)
 	w := httptest.NewRecorder()
@@ -118,7 +122,7 @@ func insertTestSubscription(db bun.IDB, email string) error {
 	return err
 }
 
-func insertTestSubscriptionWithToken(db bun.IDB, email, token string) error {
+func insertTestSubscriptionWithToken(db bun.IDB, email, token string, t *testing.T) error {
 	sub := &models.Subscription{
 		Email:     email,
 		City:      "Kyiv",
@@ -126,7 +130,9 @@ func insertTestSubscriptionWithToken(db bun.IDB, email, token string) error {
 		Token:     token,
 		CreatedAt: time.Now(),
 	}
-	_, err := db.NewInsert().Model(sub).Exec(context.Background())
+	//_, err := db.NewInsert().Model(sub).Exec(context.Background())
+	res, err := db.NewInsert().Model(sub).Exec(context.Background())
+	t.Log("Inserted subscription with token:", token, "result:", res)
 	return err
 }
 

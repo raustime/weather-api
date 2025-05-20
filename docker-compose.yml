@@ -6,7 +6,6 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: weatherdb
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - pgdata:/var/lib/postgresql/data
     ports:
       - '5432:5432'
@@ -19,9 +18,11 @@ services:
       - db
     environment:
       - DB_URL=postgres://postgres:postgres@db:5432/weatherdb?sslmode=disable
+      - TEMPLATE_DIR=/app/internal/templates
       - PGHOST=db
       - PGPORT=5432
       - PGUSER=postgres
+      - PGPASSWORD=postgres
     entrypoint: ["/app/wait-for-postgres.sh"]
     command: ["./app"]
     ports:
@@ -34,12 +35,17 @@ services:
       - db
     environment:
       - TEST_DB_URL=postgres://postgres:postgres@db:5432/weatherdb_test?sslmode=disable
+      - TEMPLATE_DIR=/app/internal/templates
+      - APP_BASE_URL=https://example.com
       - PGHOST=db
       - PGPORT=5432
       - PGUSER=postgres
+      - PGPASSWORD=postgres
     working_dir: /app
-    entrypoint: ["/wait-for-postgres.sh"]
+    entrypoint: ["/app/wait-for-postgres.sh"]
     command: ["go", "test", "-v", "./..."]
+    volumes:
+      - ./wait-for-postgres.sh:/app/wait-for-postgres.sh
 
 volumes:
   pgdata:
